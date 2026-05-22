@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.emicalculator.ui.theme.*
@@ -138,6 +141,8 @@ fun NumberInputField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     BasicTextField(
         value = value,
         onValueChange = { rawInput ->
@@ -147,7 +152,11 @@ fun NumberInputField(
             if (dotCount <= 1) onValueChange(cleaned)
         },
         keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Decimal    // shows numeric keyboard with decimal
+            keyboardType = KeyboardType.Decimal,
+            imeAction    = ImeAction.Done          // shows "Done" key on keyboard
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() }
         ),
         textStyle = MaterialTheme.typography.titleMedium.copy(
             color = MaterialTheme.colorScheme.onBackground

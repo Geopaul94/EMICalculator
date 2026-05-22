@@ -13,9 +13,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,8 +28,15 @@ import com.example.emicalculator.viewmodel.EMIViewModel
 @Composable
 fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
 
-    val state   by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val state            by viewModel.uiState.collectAsStateWithLifecycle()
+    val context          = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Hide the keyboard automatically the moment a valid result is ready —
+    // the user has entered all 3 inputs, so they no longer need to type.
+    LaunchedEffect(state.totalAmount) {
+        if (state.totalAmount.isNotEmpty()) keyboardController?.hide()
+    }
 
     val onSharePdf: () -> Unit = {
         val uri = PdfGenerator.create(context, state)
@@ -45,12 +54,13 @@ fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
+            .imePadding()                        // shrinks the scroll area when keyboard is open
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top    // start from top so rows stay above keyboard
     ) {
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
             text  = "EMI Calculator",
@@ -58,7 +68,7 @@ fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Hint so the user discovers the tap-to-select behaviour
         Text(
@@ -67,7 +77,7 @@ fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         // ── Amount row ────────────────────────────────────────────────────────
         CalcRow(
