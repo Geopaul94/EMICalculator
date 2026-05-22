@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider path configuration.
+
+    Tells the OS which directories this app is allowed to share files from.
+    We only expose the cache directory (app-private, auto-cleaned by the OS).
+
+    The `name` attribute is just an alias — it appears in the URI but doesn't
+    need to match any real directory. The `path="."` means the whole cacheDir.
+-->
+<paths>
+    <cache-path name="pdf_reports" path="." />
+</paths>

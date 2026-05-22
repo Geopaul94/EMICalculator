@@ -19,10 +19,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.EMICalculator">
 
+        <!--
+            The activity uses the Splash theme so the OS draws the splash window
+            BEFORE our Compose content inflates. MainActivity calls installSplashScreen()
+            which then hands off to the postSplashScreenTheme (Theme.EMICalculator).
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:windowSoftInputMode="adjustResize">   <!--  keyboard pushes content up, not over it  -->
+            android:theme="@style/Theme.EMICalculator.Splash"
+            android:windowSoftInputMode="adjustResize">
 
             <!-- This intent-filter marks MainActivity as the launcher screen -->
             <intent-filter>
@@ -30,6 +36,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            FileProvider — lets us share the generated PDF with other apps.
+
+            android:authorities must match the string used in PdfGenerator.kt:
+              "${context.packageName}.provider"
+
+            android:exported="false"  → other apps cannot browse our files directly,
+                                        they can only open a specific Uri we hand them.
+            android:grantUriPermissions="true" → we grant temporary read access via the Intent.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

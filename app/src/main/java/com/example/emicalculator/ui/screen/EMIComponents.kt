@@ -277,6 +277,38 @@ private fun SummaryDivider() {
     )
 }
 
+// ── SharePdfButton ────────────────────────────────────────────────────────────
+
+/**
+ * Full-width button that generates an EMI PDF report and opens the system share sheet.
+ * Uses AccentBlue border + text to signal it's the primary action.
+ *
+ * @param onClick Called when the user taps — the caller handles PDF creation + share Intent.
+ */
+@Composable
+fun SharePdfButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.5.dp,
+                color = AccentBlue,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable { onClick() }
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text  = "Share as PDF",
+            style = MaterialTheme.typography.labelLarge,
+            color = AccentBlue
+        )
+    }
+}
+
 // ── ClearButton ───────────────────────────────────────────────────────────────
 
 /**

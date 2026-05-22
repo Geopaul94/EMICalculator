@@ -11,4 +11,21 @@
         and handles all Material3 theming from that point.
     -->
     <style name="Theme.EMICalculator" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+        Splash screen theme — applied before Compose launches.
+
+        windowSplashScreenBackground  → dark background matching our app palette
+        windowSplashScreenAnimatedIcon → the same icon used on the launcher
+        postSplashScreenTheme          → hands off to the main theme once ready
+
+        On Android 12+  : the OS draws a proper animated splash window.
+        On Android 6-11 : the core-splashscreen compat library emulates it.
+    -->
+    <style name="Theme.EMICalculator.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#1A1A1C</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#2A2A2E</item>
+        <item name="postSplashScreenTheme">@style/Theme.EMICalculator</item>
+    </style>
 </resources>

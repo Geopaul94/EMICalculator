@@ -75,6 +75,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)          // Splash screen
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))   // BOM manages all Compose versions for you
     implementation(libs.androidx.ui)

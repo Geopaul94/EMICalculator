@@ -11,12 +11,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.emicalculator.pdf.PdfGenerator
 import com.example.emicalculator.viewmodel.EMIViewModel
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,7 +57,24 @@ fun EMIScreen(
     // The `by` keyword (delegate) lets us write `state.amount` instead of
     // `state.value.amount`. Just a Kotlin convenience.
 
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state   by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // ── PDF share handler ─────────────────────────────────────────────────────
+    //
+    // PdfGenerator.create() runs on the calling thread. For a lightweight one-page
+    // report this is fast enough to do on the main thread, but we keep the lambda
+    // here (close to where context lives) to avoid passing context into the ViewModel.
+    val onSharePdf: () -> Unit = {
+        val uri = PdfGenerator.create(context, state)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type  = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "EMI Loan Summary Report")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share EMI Report via"))
+    }
 
     // ── Layout ────────────────────────────────────────────────────────────────
     Column(
@@ -159,6 +179,21 @@ fun EMIScreen(
             }
         }
 
+        // ── Share as PDF Button ───────────────────────────────────────────────
+        // Only visible once a valid EMI has been calculated.
+        // Generates a styled A4 PDF and opens the OS share sheet.
+
+        AnimatedVisibility(
+            visible = state.emi.isNotEmpty(),
+            enter   = fadeIn() + expandVertically(),
+            exit    = fadeOut() + shrinkVertically()
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(16.dp))
+                SharePdfButton(onClick = onSharePdf)
+            }
+        }
+
         // ── Clear Button ──────────────────────────────────────────────────────
         // Appears (with animation) as soon as the user starts typing in any field.
         // Tapping it calls viewModel.clearAll() which resets every input + result.
@@ -173,7 +208,7 @@ fun EMIScreen(
             exit    = fadeOut() + shrinkVertically()
         ) {
             Column {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 ClearButton(onClick = viewModel::clearAll)
             }
         }
