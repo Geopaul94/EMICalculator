@@ -1,0 +1,33 @@
+# ── Build outputs ─────────────────────────────────────────────────────────────
+build/
+app/build/
+.gradle/
+
+# ── Local configuration (machine-specific, never commit) ──────────────────────
+local.properties
+*.jks
+*.keystore
+
+# ── Android Studio / IntelliJ ─────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ── Kotlin / Java ─────────────────────────────────────────────────────────────
+*.class
+*.jar
+*.aar
+
+# ── Proguard mapping (generated per release, not tracked) ─────────────────────
+*.map
+
+# ── Navigation Safe Args generated ───────────────────────────────────────────
+app/src/main/java/**/generated/
+
+# ── Test results ──────────────────────────────────────────────────────────────
+test-results/

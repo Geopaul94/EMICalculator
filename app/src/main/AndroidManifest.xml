@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        AndroidManifest.xml — The App's "ID Card"
+
+        Play Store reads this file to understand your app.
+        Key things here:
+          • android:label      — App name shown on the device
+          • android:icon       — Launcher icon (add via Android Studio → Image Asset)
+          • android:theme      — Must be NoActionBar so Compose controls the full screen
+    -->
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.EMICalculator">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">   <!--  keyboard pushes content up, not over it  -->
+
+            <!-- This intent-filter marks MainActivity as the launcher screen -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

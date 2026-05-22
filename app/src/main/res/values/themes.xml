@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Theme.EMICalculator — XML theme applied before Compose launches.
+
+        We extend NoActionBar because:
+          • Compose draws its own top bar (or none) — we don't want the XML ActionBar
+          • enableEdgeToEdge() in MainActivity needs a NoActionBar theme to work properly
+
+        After this theme is applied, our EMICalculatorTheme Composable takes over
+        and handles all Material3 theming from that point.
+    -->
+    <style name="Theme.EMICalculator" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
