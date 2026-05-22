@@ -18,10 +18,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.emicalculator.ui.theme.*
+import java.text.NumberFormat
+import java.util.Locale
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Reusable UI Components
@@ -119,6 +125,76 @@ fun CalcRow(
     }
 }
 
+// ── ThousandSeparatorTransformation ──────────────────────────────────────────
+//
+// A VisualTransformation that inserts thousand-separator commas while the user
+// types, WITHOUT touching the actual state value (which stays a plain number).
+//
+// HOW IT WORKS:
+//   • The raw text "100000" lives in state and is used for all calculations.
+//   • `filter()` reformats it to "1,00,000" (Indian) or "100,000" (international)
+//     depending on the device locale — Locale.getDefault() picks automatically.
+//   • The OffsetMapping keeps the cursor in the right place as commas are
+//     inserted/removed while the user types.
+//
+// Indian format  (Locale en_IN / hi_IN …) : 1,00,000  — used in South Asia
+// International format (en_US, en_GB …)   : 100,000   — used everywhere else
+
+object ThousandSeparatorTransformation : VisualTransformation {
+
+    override fun filter(text: AnnotatedString): TransformedText {
+        val raw = text.text
+
+        // Keep only the integer part for comma-formatting; preserve any decimal
+        val dotIdx  = raw.indexOf('.')
+        val intPart = if (dotIdx >= 0) raw.substring(0, dotIdx) else raw
+        val decPart = if (dotIdx >= 0) raw.substring(dotIdx)    else ""
+
+        // Format the integer part using the device locale
+        val fmtInt: String = when {
+            intPart.isEmpty() -> ""
+            else -> try {
+                NumberFormat.getNumberInstance(Locale.getDefault())
+                    .apply { maximumFractionDigits = 0 }
+                    .format(intPart.toLong())
+            } catch (_: Exception) {
+                intPart   // fallback: show as-is if parsing fails
+            }
+        }
+
+        val fmtText = fmtInt + decPart
+
+        val mapping = object : OffsetMapping {
+
+            // Raw cursor position → display cursor position
+            override fun originalToTransformed(offset: Int): Int {
+                return if (offset <= intPart.length) {
+                    // Walk fmtInt and count digits until we've seen `offset` of them
+                    var digitsSeen = 0
+                    for (j in fmtInt.indices) {
+                        if (fmtInt[j].isDigit()) {
+                            if (digitsSeen == offset) return j
+                            digitsSeen++
+                        }
+                    }
+                    fmtInt.length   // cursor is past the last digit (at decimal point or end)
+                } else {
+                    // Decimal part: offset shifts by however many separators fmtInt contains
+                    offset + fmtInt.count { !it.isDigit() }
+                }
+            }
+
+            // Display cursor position → raw cursor position
+            override fun transformedToOriginal(offset: Int): Int {
+                val separators = fmtText.take(offset).count { !it.isDigit() && it != '.' }
+                return (offset - separators).coerceIn(0, raw.length)
+            }
+        }
+
+        return TransformedText(AnnotatedString(fmtText), mapping)
+    }
+}
+
 // ── NumberInputField ──────────────────────────────────────────────────────────
 
 /**
@@ -139,21 +215,25 @@ fun NumberInputField(
     value: String,
     placeholder: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    thousandSeparator: Boolean = false   // set true for currency fields (Amount, EMI)
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
     BasicTextField(
         value = value,
         onValueChange = { rawInput ->
-            // Sanitise: only allow digits and a single decimal point
+            // Sanitise: only allow digits and a single decimal point.
+            // VisualTransformation adds commas visually — we never store them.
             val cleaned = rawInput.filter { it.isDigit() || it == '.' }
             val dotCount = cleaned.count { it == '.' }
             if (dotCount <= 1) onValueChange(cleaned)
         },
+        visualTransformation = if (thousandSeparator) ThousandSeparatorTransformation
+                               else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Decimal,
-            imeAction    = ImeAction.Done          // shows "Done" key on keyboard
+            imeAction    = ImeAction.Done
         ),
         keyboardActions = KeyboardActions(
             onDone = { keyboardController?.hide() }

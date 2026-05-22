@@ -89,10 +89,11 @@ fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
                 ResultText(value = state.amount, modifier = Modifier.weight(1f))
             } else {
                 NumberInputField(
-                    value         = state.amount,
-                    placeholder   = "0",
-                    onValueChange = viewModel::onAmountChange,
-                    modifier      = Modifier.weight(1f)
+                    value             = state.amount,
+                    placeholder       = "0",
+                    onValueChange     = viewModel::onAmountChange,
+                    modifier          = Modifier.weight(1f),
+                    thousandSeparator = true
                 )
             }
         }
@@ -161,10 +162,11 @@ fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
                 ResultText(value = state.emi, modifier = Modifier.weight(1f))
             } else {
                 NumberInputField(
-                    value         = state.emi,
-                    placeholder   = "0",
-                    onValueChange = viewModel::onEmiChange,
-                    modifier      = Modifier.weight(1f)
+                    value             = state.emi,
+                    placeholder       = "0",
+                    onValueChange     = viewModel::onEmiChange,
+                    modifier          = Modifier.weight(1f),
+                    thousandSeparator = true
                 )
             }
         }
