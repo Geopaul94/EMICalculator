@@ -2,162 +2,214 @@ package com.example.emicalculator.viewmodel
 
 import androidx.lifecycle.ViewModel
 import com.example.emicalculator.model.EMIState
+import com.example.emicalculator.model.SolveFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.ln
 import kotlin.math.pow
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  LAYER 2 — VIEWMODEL
-//
-//  The ViewModel is the "brain" of your screen. It:
-//    1. Holds the single source of truth for the UI state (EMIState)
-//    2. Exposes event-handler functions the UI can call
-//    3. Runs all business logic (EMI calculation)
-//    4. Survives screen rotations — your UI doesn't lose data when
-//       the phone is flipped. This is the #1 reason to use ViewModel.
-//
-//  What the ViewModel does NOT do:
-//    ✗ Import anything from androidx.compose (no Composables here)
-//    ✗ Hold a reference to Context, Activity, or View
-//    ✗ Touch the UI directly
-// ─────────────────────────────────────────────────────────────────────────────
 
 class EMIViewModel : ViewModel() {
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    //
-    // StateFlow is a stream that always holds the latest value.
-    // Think of it like a live variable the UI can "watch".
-    //
-    // WHY two variables (_uiState and uiState)?
-    //
-    //  _uiState  → MutableStateFlow  — PRIVATE, only ViewModel can modify it.
-    //   uiState  → StateFlow         — PUBLIC, read-only. The UI collects from this.
-    //
-    // This pattern is called "backing property". It prevents the UI from
-    // accidentally changing state directly — all changes must go through
-    // the event functions below. This keeps data flow one-directional:
-    //
-    //   User taps → UI calls ViewModel function → ViewModel updates _uiState
-    //   → uiState emits new value → UI recomposes automatically
-
-    private val _uiState = MutableStateFlow(EMIState())   // starts with empty/default state
+    private val _uiState = MutableStateFlow(EMIState())
     val uiState: StateFlow<EMIState> = _uiState.asStateFlow()
 
-    // ── Event Handlers ────────────────────────────────────────────────────────
-    //
-    // Each function below is called by the UI when the user does something.
-    // They update the relevant field in state, then trigger a recalculation.
-    //
-    // WHY use .update { it.copy(...) } instead of just assigning?
-    // StateFlow is designed to be updated atomically. `.update` ensures
-    // thread-safety. `.copy()` creates a new EMIState with only the changed
-    // field — all other fields stay the same.
+    // ── Mode switch ───────────────────────────────────────────────────────────
 
-    fun onAmountChange(newValue: String) {
-        _uiState.update { currentState ->
-            currentState.copy(amount = newValue)
-        }
-        recalculate()
+    // Switching what to solve for resets all fields — the previously calculated
+    // value in one field could confuse the user if silently reused as an input.
+    fun onSolveForChange(solveFor: SolveFor) {
+        _uiState.update { EMIState(solveFor = solveFor, isYears = it.isYears) }
     }
 
-    fun onInterestRateChange(newValue: String) {
-        _uiState.update { it.copy(interestRate = newValue) }
-        recalculate()
-    }
+    // ── Input event handlers ──────────────────────────────────────────────────
 
-    fun onPeriodChange(newValue: String) {
-        _uiState.update { it.copy(period = newValue) }
-        recalculate()
-    }
+    fun onAmountChange(v: String)       { _uiState.update { it.copy(amount = v) };       recalculate() }
+    fun onInterestRateChange(v: String) { _uiState.update { it.copy(interestRate = v) }; recalculate() }
+    fun onPeriodChange(v: String)       { _uiState.update { it.copy(period = v) };       recalculate() }
+    fun onEmiChange(v: String)          { _uiState.update { it.copy(emi = v) };          recalculate() }
 
     fun onPeriodTypeChange(isYears: Boolean) {
         _uiState.update { it.copy(isYears = isYears) }
         recalculate()
     }
 
-    /** Resets every input and result back to the initial empty state. */
     fun clearAll() {
-        _uiState.update { EMIState() }
+        // Preserve the current mode and period unit — those are user preferences.
+        _uiState.update { EMIState(solveFor = it.solveFor, isYears = it.isYears) }
     }
 
-    // ── Business Logic ────────────────────────────────────────────────────────
-    //
-    // This is private — the UI has no idea this function exists.
-    // It runs automatically every time any input changes.
+    // ── Calculation dispatcher ────────────────────────────────────────────────
 
     private fun recalculate() {
-        val state = _uiState.value
+        when (_uiState.value.solveFor) {
+            SolveFor.EMI           -> solveForEmi()
+            SolveFor.AMOUNT        -> solveForAmount()
+            SolveFor.INTEREST_RATE -> solveForInterestRate()
+            SolveFor.PERIOD        -> solveForPeriod()
+        }
+    }
 
-        // Try to parse each input. If any field is empty or invalid,
-        // clear the results and stop. The `?: run { ... ; return }` pattern
-        // means: "if null, execute the block and exit the function."
-        val principal   = state.amount.toDoubleOrNull()       ?: run { clearResults(); return }
-        val annualRate  = state.interestRate.toDoubleOrNull() ?: run { clearResults(); return }
-        val periodValue = state.period.toDoubleOrNull()       ?: run { clearResults(); return }
+    // ── Solve for EMI  (inputs: Amount, Interest %, Period) ───────────────────
 
-        // Guard against zero or negative values
-        if (principal <= 0 || annualRate <= 0 || periodValue <= 0) {
-            clearResults()
+    private fun solveForEmi() {
+        val s = _uiState.value
+        val p = s.amount.toDoubleOrNull()       ?: return clearResult()
+        val a = s.interestRate.toDoubleOrNull() ?: return clearResult()
+        val t = s.period.toDoubleOrNull()       ?: return clearResult()
+        if (p <= 0 || a <= 0 || t <= 0) return clearResult()
+
+        val n = if (s.isYears) t * 12 else t
+        val r = a / (12.0 * 100.0)
+
+        val emi = if (r == 0.0) p / n
+                  else { val c = (1 + r).pow(n); p * r * c / (c - 1) }
+
+        val total    = emi * n
+        val interest = total - p
+        _uiState.update { it.copy(emi = fmt(emi), totalInterest = fmt(interest), totalAmount = fmt(total)) }
+    }
+
+    // ── Solve for Amount  (inputs: EMI, Interest %, Period) ──────────────────
+    //
+    //  Reverse of the EMI formula:
+    //    P = EMI × ((1+r)^n − 1) / (r × (1+r)^n)
+
+    private fun solveForAmount() {
+        val s = _uiState.value
+        val e = s.emi.toDoubleOrNull()          ?: return clearResult()
+        val a = s.interestRate.toDoubleOrNull() ?: return clearResult()
+        val t = s.period.toDoubleOrNull()       ?: return clearResult()
+        if (e <= 0 || a <= 0 || t <= 0) return clearResult()
+
+        val n = if (s.isYears) t * 12 else t
+        val r = a / (12.0 * 100.0)
+
+        val p = if (r == 0.0) e * n
+                else { val c = (1 + r).pow(n); e * (c - 1) / (r * c) }
+
+        val total    = e * n
+        val interest = total - p
+        _uiState.update { it.copy(amount = fmt(p), totalInterest = fmt(interest), totalAmount = fmt(total)) }
+    }
+
+    // ── Solve for Interest Rate  (inputs: Amount, EMI, Period) ───────────────
+    //
+    //  No closed-form solution exists. We use binary search (bisection) on the
+    //  monthly rate `r` in the range (0, 1], converging to 60 decimal places
+    //  of precision after 200 iterations — effectively exact.
+
+    private fun solveForInterestRate() {
+        val s = _uiState.value
+        val p = s.amount.toDoubleOrNull() ?: return clearResult()
+        val e = s.emi.toDoubleOrNull()    ?: return clearResult()
+        val t = s.period.toDoubleOrNull() ?: return clearResult()
+        if (p <= 0 || e <= 0 || t <= 0) return clearResult()
+
+        val n = if (s.isYears) t * 12 else t
+
+        // EMI must be at least p/n (the zero-interest case)
+        if (e < p / n - 0.001) return clearResult()
+
+        // Special case: zero interest
+        if (e <= p / n + 0.001) {
+            val total = e * n
+            _uiState.update { it.copy(interestRate = "0.00", totalInterest = fmt(total - p), totalAmount = fmt(total)) }
             return
         }
 
-        // Convert period to months (EMI formula always works in months)
-        val totalMonths: Double = if (state.isYears) periodValue * 12 else periodValue
+        val monthlyRate = bisect(p, e, n) ?: return clearResult()
+        val annualPct   = monthlyRate * 12.0 * 100.0
 
-        // ── EMI Formula ───────────────────────────────────────────────────────
-        //
-        //         P × r × (1 + r)ⁿ
-        //  EMI = ─────────────────────
-        //          (1 + r)ⁿ − 1
-        //
-        //  Where:
-        //    P = Principal loan amount
-        //    r = Monthly interest rate = Annual rate / (12 × 100)
-        //    n = Total number of months
-        //
-        //  Special case: if interest is 0%, the formula breaks (divide by zero).
-        //  In that case, EMI is simply principal ÷ months.
+        val total    = e * n
+        val interest = total - p
+        _uiState.update { it.copy(interestRate = fmtRate(annualPct), totalInterest = fmt(interest), totalAmount = fmt(total)) }
+    }
 
-        val monthlyRate: Double = annualRate / (12.0 * 100.0)
+    // ── Solve for Period  (inputs: Amount, Interest %, EMI) ──────────────────
+    //
+    //  From the EMI formula, solving for n (months):
+    //    n = ln(EMI / (EMI − P×r)) / ln(1 + r)
+    //
+    //  Requires EMI > P×r (otherwise the loan can never be repaid).
 
-        val emi: Double = if (monthlyRate == 0.0) {
-            principal / totalMonths
-        } else {
-            val compoundFactor = (1 + monthlyRate).pow(totalMonths)
-            principal * monthlyRate * compoundFactor / (compoundFactor - 1)
+    private fun solveForPeriod() {
+        val s = _uiState.value
+        val p = s.amount.toDoubleOrNull()       ?: return clearResult()
+        val a = s.interestRate.toDoubleOrNull() ?: return clearResult()
+        val e = s.emi.toDoubleOrNull()          ?: return clearResult()
+        if (p <= 0 || a <= 0 || e <= 0) return clearResult()
+
+        val r               = a / (12.0 * 100.0)
+        val monthlyInterest = p * r
+
+        // EMI must exceed monthly interest or the loan is never paid off
+        if (r > 0 && e <= monthlyInterest) return clearResult()
+
+        val n = if (r == 0.0) p / e
+                else ln(e / (e - monthlyInterest)) / ln(1 + r)
+
+        if (n <= 0 || n.isNaN() || n.isInfinite()) return clearResult()
+
+        val total    = e * n
+        val interest = total - p
+        // Display period in the unit the user has selected via the toggle
+        val display = if (s.isYears) fmtDecimal(n / 12) else fmtDecimal(n)
+
+        _uiState.update { it.copy(period = display, totalInterest = fmt(interest), totalAmount = fmt(total)) }
+    }
+
+    // ── Binary search for monthly rate ────────────────────────────────────────
+
+    private fun bisect(principal: Double, emi: Double, months: Double): Double? {
+        fun emiAt(r: Double): Double {
+            val c = (1 + r).pow(months)
+            return principal * r * c / (c - 1)
         }
 
-        val totalPayment  = emi * totalMonths
-        val totalInterest = totalPayment - principal
+        var lo = 1e-9
+        var hi = 1.0  // 100 % per month upper bound
 
-        // Push the new results into state — UI will automatically recompose
-        _uiState.update {
-            it.copy(
-                emi           = formatCurrency(emi),
-                totalInterest = formatCurrency(totalInterest),
-                totalAmount   = formatCurrency(totalPayment)
-            )
+        if (emiAt(hi) < emi) return null  // impossible — EMI exceeds any realistic rate
+
+        repeat(200) {
+            val mid = (lo + hi) / 2.0
+            if (emiAt(mid) < emi) lo = mid else hi = mid
+        }
+        return (lo + hi) / 2.0
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun clearResult() {
+        _uiState.update { s ->
+            when (s.solveFor) {
+                SolveFor.EMI           -> s.copy(emi = "", totalInterest = "", totalAmount = "")
+                SolveFor.AMOUNT        -> s.copy(amount = "", totalInterest = "", totalAmount = "")
+                SolveFor.INTEREST_RATE -> s.copy(interestRate = "", totalInterest = "", totalAmount = "")
+                SolveFor.PERIOD        -> s.copy(period = "", totalInterest = "", totalAmount = "")
+            }
         }
     }
 
-    /** Resets all result fields to empty (shown as "—" in the UI). */
-    private fun clearResults() {
-        _uiState.update { it.copy(emi = "", totalInterest = "", totalAmount = "") }
-    }
-
-    /**
-     * Formats a Double as a locale-aware integer currency string.
-     * e.g.  10911.45  →  "10,911"  (in en-US locale)
-     *                 →  "10.911"  (in de-DE locale)
-     */
-    private fun formatCurrency(value: Double): String {
-        return NumberFormat.getNumberInstance(Locale.getDefault())
+    /** Formats a number as a rounded integer with locale thousands separators. */
+    private fun fmt(value: Double): String =
+        NumberFormat.getNumberInstance(Locale.getDefault())
             .apply { maximumFractionDigits = 0 }
             .format(value.toLong())
-    }
+
+    /** Formats a period with up to 1 decimal place (e.g. "18.5"). */
+    private fun fmtDecimal(value: Double): String =
+        NumberFormat.getNumberInstance(Locale.getDefault())
+            .apply { maximumFractionDigits = 1; minimumFractionDigits = 0 }
+            .format(value)
+
+    /** Formats an interest rate with exactly 2 decimal places (e.g. "8.75"). */
+    private fun fmtRate(value: Double): String =
+        NumberFormat.getNumberInstance(Locale.getDefault())
+            .apply { maximumFractionDigits = 2; minimumFractionDigits = 2 }
+            .format(value)
 }

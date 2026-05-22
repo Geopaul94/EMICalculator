@@ -55,21 +55,22 @@ import com.example.emicalculator.ui.theme.*
 fun CalcRow(
     label: String,
     isSelected: Boolean,
-    content: @Composable RowScope.() -> Unit   // "slot" — caller fills this in
+    onRadioClick: () -> Unit,              // called when the user taps the radio dot
+    content: @Composable RowScope.() -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
 
-        // ── Radio Button (decorative circle) ──────────────────────────────────
+        // ── Radio Button — tappable to select this field as the unknown ────────
         Box(
             modifier = Modifier
                 .size(24.dp)
-                .border(width = 2.dp, color = AccentBlue, shape = CircleShape),
+                .border(width = 2.dp, color = AccentBlue, shape = CircleShape)
+                .clickable { onRadioClick() },
             contentAlignment = Alignment.Center
         ) {
-            // If this is the "result" row, fill the centre dot
             if (isSelected) {
                 Box(
                     modifier = Modifier
