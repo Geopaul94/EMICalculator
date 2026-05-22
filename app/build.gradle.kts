@@ -1,11 +1,12 @@
-// ─────────────────────────────────────────────────────────────────────────────
-//  app/build.gradle.kts  —  Module-level build configuration
-//
-//  This file tells Gradle:
-//    • What Android features to enable (Compose, etc.)
-//    • What the app's identity is (applicationId, version, SDK targets)
-//    • What libraries the app depends on
-// ─────────────────────────────────────────────────────────────────────────────
+import java.util.Properties
+
+// Signing credentials live in local.properties (gitignored — never committed).
+// ⚠️  IMPORTANT: Back up loansolver-release.jks + these passwords safely.
+//     Losing them means you can NEVER update the app on the Play Store.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { load(it) }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -14,75 +15,98 @@ plugins {
 }
 
 android {
-    namespace   = "com.loansolver.app"
-    compileSdk  = 35
+    namespace  = "com.loansolver.app"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId  = "com.loansolver.app"         // MUST be unique on Play Store
-        minSdk         = 26                            // Lowest Android version supported (~95% of devices)
-        targetSdk      = 35                            // Android version you designed for
-        versionCode    = 1                             // Integer: increment by 1 for every Play Store upload
-        versionName    = "1.0.0"                       // Human-readable version shown on Play Store
+        applicationId = "com.loansolver.app"
+        minSdk        = 26
+        targetSdk     = 35
+        versionCode   = 1
+        versionName   = "1.0.0"
     }
 
     // ── Signing ───────────────────────────────────────────────────────────────
-    // Before uploading to Play Store you need a keystore.
-    // Steps:
-    //   1. In Android Studio → Build → Generate Signed Bundle/APK
-    //   2. Create a new keystore (keep the file + passwords safe!)
-    //   3. Uncomment and fill in the block below for automated release builds.
-    //
-    // signingConfigs {
-    //     create("release") {
-    //         storeFile     = file("../keystore/my-release-key.jks")
-    //         storePassword = System.getenv("KEYSTORE_PASSWORD")   // use env vars, not hardcoded!
-    //         keyAlias      = System.getenv("KEY_ALIAS")
-    //         keyPassword   = System.getenv("KEY_PASSWORD")
-    //     }
-    // }
+    signingConfigs {
+        create("release") {
+            storeFile     = file(localProps.getProperty("KEYSTORE_PATH", ""))
+            storePassword = localProps.getProperty("KEYSTORE_PASSWORD", "")
+            keyAlias      = localProps.getProperty("KEY_ALIAS", "")
+            keyPassword   = localProps.getProperty("KEY_PASSWORD", "")
+        }
+    }
 
+    // ── Build types ───────────────────────────────────────────────────────────
     buildTypes {
-        // Debug build — for development. NOT for Play Store.
         debug {
             isDebuggable        = true
-            applicationIdSuffix = ".debug"        // Lets you install debug + release side by side
+            applicationIdSuffix = ".debug"
             versionNameSuffix   = "-debug"
         }
 
-        // Release build — this is what you upload to the Play Store.
         release {
-            isMinifyEnabled    = true             // Shrinks & obfuscates code (smaller APK)
-            isShrinkResources  = true             // Removes unused images/strings
+            // R8 shrinks, obfuscates, and optimises code → much smaller APK
+            isMinifyEnabled   = true
+            isShrinkResources = true
+            signingConfig     = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // signingConfig = signingConfigs.getByName("release")  // Uncomment after keystore setup
         }
     }
 
+    // ── AAB splits ────────────────────────────────────────────────────────────
+    // Play Store delivers only the slices the user's device actually needs.
+    // A user on a 2x-screen phone with English + ARM64 gets a much smaller
+    // download than the full AAB — typically 40-60 % smaller.
+    bundle {
+        language { enableSplit = true }   // only user's language(s)
+        density  { enableSplit = true }   // only matching screen density
+        abi      { enableSplit = true }   // only matching CPU architecture
+    }
+
+    // ── Compiler options ──────────────────────────────────────────────────────
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs += listOf(
+            "-Xjvm-default=all",           // optimise interface default methods
+            "-opt-in=kotlin.RequiresOptIn"
+        )
     }
+
     buildFeatures {
-        compose = true   // Enable Jetpack Compose
+        compose      = true
+        buildConfig  = false   // removes the unused BuildConfig class
+        resValues    = false   // we use string resources, not generated res values
+    }
+
+    // ── Strip unnecessary packaging metadata ─────────────────────────────────
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/LICENSE.md",
+                "META-INF/LICENSE-notice.md",
+                "META-INF/*.kotlin_module",
+                "kotlin-tooling-metadata.json",
+                "DebugProbesKt.bin"
+            )
+        }
     }
 }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.core.splashscreen)          // Splash screen
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))   // BOM manages all Compose versions for you
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.material3)
-
-    // ViewModel — lets our EMIViewModel survive screen rotations
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 }

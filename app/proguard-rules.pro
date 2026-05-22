@@ -1,21 +1,40 @@
-# ─────────────────────────────────────────────────────────────────────────────
-#  ProGuard Rules
-#
-#  ProGuard runs during a release build. It does three things:
-#    1. Minify  — renames classes/methods to short names (a, b, c …) → smaller APK
-#    2. Shrink  — removes code that is never called
-#    3. Obfuscate — makes it harder for others to reverse-engineer your app
-#
-#  Sometimes ProGuard removes things your app actually needs at runtime.
-#  You add "-keep" rules here to protect those classes.
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Kotlin ────────────────────────────────────────────────────────────────────
+-dontwarn kotlin.**
+-keepattributes *Annotation*, InnerClasses, Signature, SourceFile, LineNumberTable
 
-# Keep ViewModel classes (they are referenced by name internally by Compose)
+# ── Jetpack Compose ───────────────────────────────────────────────────────────
+# The Compose compiler plugin handles most rules automatically.
+# We only protect the runtime internals that R8 can incorrectly strip.
+-keep class androidx.compose.runtime.** { *; }
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable *;
+}
+
+# ── ViewModel ─────────────────────────────────────────────────────────────────
 -keep class * extends androidx.lifecycle.ViewModel { *; }
+-keepclassmembers class * extends androidx.lifecycle.ViewModel {
+    <init>();
+}
 
-# Keep data classes used in StateFlow (Kotlin reflection reads field names)
--keep class com.example.emicalculator.model.** { *; }
+# ── Our model (StateFlow holds data classes — field names must survive R8) ────
+-keep class com.loansolver.app.model.** { *; }
 
-# Kotlin serialization / coroutines internals
--keepattributes *Annotation*
+# ── Coroutines ────────────────────────────────────────────────────────────────
 -keepclassmembers class kotlinx.coroutines.** { volatile <fields>; }
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-dontwarn kotlinx.coroutines.**
+
+# ── FileProvider (used for PDF sharing) ──────────────────────────────────────
+-keep class androidx.core.content.FileProvider { *; }
+
+# ── Splash screen ─────────────────────────────────────────────────────────────
+-keep class androidx.core.splashscreen.** { *; }
+
+# ── Remove all debug/verbose logging in release ───────────────────────────────
+# This shrinks the binary and prevents internal info from leaking.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+    public static int i(...);
+}
