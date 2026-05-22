@@ -1,4 +1,4 @@
-package com.example.emicalculator.ui.theme
+package com.loansolver.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

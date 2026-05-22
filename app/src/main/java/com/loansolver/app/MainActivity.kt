@@ -1,11 +1,12 @@
-package com.example.emicalculator
+package com.loansolver.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.emicalculator.ui.screen.EMIScreen
-import com.example.emicalculator.ui.theme.EMICalculatorTheme
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.loansolver.app.ui.screen.EMIScreen
+import com.loansolver.app.ui.theme.EMICalculatorTheme
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MainActivity — The App Entry Point
@@ -24,6 +25,10 @@ import com.example.emicalculator.ui.theme.EMICalculatorTheme
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // installSplashScreen() MUST be called before super.onCreate() so the
+        // OS can display the splash window before Compose starts inflating.
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
 
         // Makes the app draw behind the system bars (modern full-screen look)
