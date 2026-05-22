@@ -1,4 +1,5 @@
 <resources>
     <!-- App name shown on the device home screen and in the Play Store listing -->
-    <string name="app_name">EMI Calculator</string>
+    <string name="app_name">LoanSolver</string>
+    <string name="app_tagline">EMI &amp; Loan Calculator</string>
 </resources>

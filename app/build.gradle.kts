@@ -14,11 +14,11 @@ plugins {
 }
 
 android {
-    namespace   = "com.example.emicalculator"   // Must match your package name
-    compileSdk  = 35                             // The SDK version used to compile
+    namespace   = "com.loansolver.app"
+    compileSdk  = 35
 
     defaultConfig {
-        applicationId  = "com.example.emicalculator"  // MUST be unique on Play Store
+        applicationId  = "com.loansolver.app"         // MUST be unique on Play Store
         minSdk         = 26                            // Lowest Android version supported (~95% of devices)
         targetSdk      = 35                            // Android version you designed for
         versionCode    = 1                             // Integer: increment by 1 for every Play Store upload

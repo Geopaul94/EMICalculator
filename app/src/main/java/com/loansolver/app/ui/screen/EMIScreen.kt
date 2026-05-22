@@ -1,4 +1,4 @@
-package com.example.emicalculator.ui.screen
+package com.loansolver.app.ui.screen
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -21,9 +21,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.emicalculator.model.SolveFor
-import com.example.emicalculator.pdf.PdfGenerator
-import com.example.emicalculator.viewmodel.EMIViewModel
+import com.loansolver.app.model.SolveFor
+import com.loansolver.app.pdf.PdfGenerator
+import com.loansolver.app.viewmodel.EMIViewModel
 
 @Composable
 fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
@@ -63,7 +63,7 @@ fun EMIScreen(viewModel: EMIViewModel = viewModel()) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text  = "EMI Calculator",
+            text  = "LoanSolver",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground
         )

@@ -1,8 +1,8 @@
-package com.example.emicalculator.viewmodel
+package com.loansolver.app.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.example.emicalculator.model.EMIState
-import com.example.emicalculator.model.SolveFor
+import com.loansolver.app.model.EMIState
+import com.loansolver.app.model.SolveFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

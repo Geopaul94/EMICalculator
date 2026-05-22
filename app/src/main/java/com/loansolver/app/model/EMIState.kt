@@ -1,4 +1,4 @@
-package com.example.emicalculator.model
+package com.loansolver.app.model
 
 // Which of the four loan variables the user wants to calculate.
 // The filled radio dot on screen always shows the active SolveFor.

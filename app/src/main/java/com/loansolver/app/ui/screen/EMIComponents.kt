@@ -1,4 +1,4 @@
-package com.example.emicalculator.ui.screen
+package com.loansolver.app.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +25,7 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.example.emicalculator.ui.theme.*
+import com.loansolver.app.ui.theme.*
 import java.text.NumberFormat
 import java.util.Locale
 

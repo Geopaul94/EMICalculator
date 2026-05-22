@@ -1,12 +1,12 @@
-package com.example.emicalculator
+package com.loansolver.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.example.emicalculator.ui.screen.EMIScreen
-import com.example.emicalculator.ui.theme.EMICalculatorTheme
+import com.loansolver.app.ui.screen.EMIScreen
+import com.loansolver.app.ui.theme.EMICalculatorTheme
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MainActivity — The App Entry Point

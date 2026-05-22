@@ -1,4 +1,4 @@
-package com.example.emicalculator.pdf
+package com.loansolver.app.pdf
 
 import android.content.Context
 import android.graphics.Canvas
@@ -8,7 +8,7 @@ import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.core.content.FileProvider
-import com.example.emicalculator.model.EMIState
+import com.loansolver.app.model.EMIState
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
