@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.core.content.FileProvider
@@ -25,10 +26,11 @@ import java.util.Locale
 //    4. FileProvider converts the private file path into a content:// Uri
 //       that other apps (WhatsApp, Gmail, Files…) are allowed to read.
 //
-//  WHY cacheDir and not filesDir?
-//    cacheDir is the right place for temporary generated files. The OS will
-//    clean it up when disk space is low. We don't need to keep the PDF
-//    permanently — the user can regenerate it any time.
+//  LAYOUT RULE:
+//    All font sizes below are true PDF points — never scale textSize
+//    independently of the row positions, or text will overlap/overflow.
+//    Vertical positions advance through a running `y` cursor so spacing
+//    always follows the actual text heights.
 // ─────────────────────────────────────────────────────────────────────────────
 
 object PdfGenerator {
@@ -37,24 +39,21 @@ object PdfGenerator {
     private const val PAGE_WIDTH  = 595f
     private const val PAGE_HEIGHT = 842f
 
-    // Horizontal margins
-    private const val MARGIN = 40f
+    private const val MARGIN = 48f
+    private const val CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN
 
-    // Brand colours (same hex as Color.kt)
-    private val COL_BACKGROUND = Color.parseColor("#1A1A1C")
-    private val COL_SURFACE    = Color.parseColor("#2A2A2E")
-    private val COL_DIVIDER    = Color.parseColor("#3A3A3C")
-    private val COL_WHITE      = Color.parseColor("#E5E5E7")
-    private val COL_GRAY       = Color.parseColor("#8E8E93")
-    private val COL_BLUE       = Color.parseColor("#4A9EFF")
-    private val COL_AMBER      = Color.parseColor("#FF9F0A")
-    private val COL_GREEN      = Color.parseColor("#30D158")
+    // Light report palette — prints cleanly and reads well in every viewer
+    private val COL_TEXT       = Color.parseColor("#1C1C1E")   // near-black
+    private val COL_GRAY       = Color.parseColor("#6E6E73")   // secondary text
+    private val COL_LIGHT_GRAY = Color.parseColor("#AEAEB2")   // footer text
+    private val COL_CARD       = Color.parseColor("#F6F6F8")   // card fill
+    private val COL_BORDER     = Color.parseColor("#E2E2E7")   // card border / dividers
+    private val COL_BLUE       = Color.parseColor("#1D6ADE")   // brand / EMI highlight
+    private val COL_AMBER      = Color.parseColor("#B26A00")   // interest
+    private val COL_GREEN      = Color.parseColor("#1E8E3E")   // total amount
 
     /**
      * Creates the PDF and returns a content:// Uri ready for ACTION_SEND.
-     *
-     * @param context  Any context (activity or application) — used for cacheDir + FileProvider.
-     * @param state    Current UI state containing both inputs and calculated results.
      */
     fun create(context: Context, state: EMIState): Uri {
         val document = PdfDocument()
@@ -72,7 +71,6 @@ object PdfGenerator {
         FileOutputStream(file).use { document.writeTo(it) }
         document.close()
 
-        // Expose via FileProvider so external apps can read it
         return FileProvider.getUriForFile(
             context,
             "${context.packageName}.provider",
@@ -83,97 +81,187 @@ object PdfGenerator {
     // ── Drawing ───────────────────────────────────────────────────────────────
 
     private fun drawReport(canvas: Canvas, state: EMIState) {
+        canvas.drawColor(Color.WHITE)
 
-        // ── Header band ───────────────────────────────────────────────────────
-        canvas.drawRect(0f, 0f, PAGE_WIDTH, 130f, fillPaint(COL_BACKGROUND))
+        var y = 64f
 
-        // App name (small, above title)
+        // ── Header ────────────────────────────────────────────────────────────
         canvas.drawText(
-            "EMI CALCULATOR",
-            MARGIN, 52f,
-            textPaint(COL_BLUE, 12f, bold = true, letterSpaced = true)
+            "LOANSOLVER",
+            MARGIN, y,
+            textPaint(COL_BLUE, 11f, bold = true, letterSpaced = true)
         )
+        y += 30f
 
-        // Report title
         canvas.drawText(
             "Loan Summary Report",
-            MARGIN, 84f,
-            textPaint(COL_WHITE, 26f, bold = true)
+            MARGIN, y,
+            textPaint(COL_TEXT, 24f, bold = true)
         )
 
-        // Generation date
         val date = SimpleDateFormat("dd MMM yyyy  •  hh:mm a", Locale.getDefault()).format(Date())
-        canvas.drawText(date, MARGIN, 108f, textPaint(COL_GRAY, 12f))
+        canvas.drawText(
+            date,
+            PAGE_WIDTH - MARGIN, y,
+            textPaint(COL_GRAY, 10f, align = Paint.Align.RIGHT)
+        )
+        y += 24f
 
-        // ── Inputs card ───────────────────────────────────────────────────────
-        val cardTop = 150f
-        drawCard(canvas, cardTop, 290f)
+        canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, strokePaint(COL_BORDER, 1f))
+        y += 36f
 
-        sectionLabel(canvas, "LOAN DETAILS", cardTop + 28f)
-
+        // ── Loan details card ─────────────────────────────────────────────────
         val period = if (state.isYears) "${state.period} Years" else "${state.period} Months"
-        dataRow(canvas, "Loan Amount",   "₹ ${state.amount}",        cardTop + 68f,  COL_WHITE)
-        divider(canvas, cardTop + 90f)
-        dataRow(canvas, "Interest Rate", "${state.interestRate} % p.a.", cardTop + 118f, COL_WHITE)
-        divider(canvas, cardTop + 140f)
-        dataRow(canvas, "Loan Period",   period,                     cardTop + 168f, COL_WHITE)
+        y = drawDataCard(
+            canvas, y, "LOAN DETAILS",
+            listOf(
+                Row("Loan Amount",   rupee(state.amount), COL_TEXT),
+                Row("Interest Rate", "${state.interestRate} % p.a.", COL_TEXT),
+                Row("Loan Period",   period, COL_TEXT)
+            )
+        )
+        y += 28f
 
-        // ── Results card ─────────────────────────────────────────────────────
-        val resTop = 318f
-        drawCard(canvas, resTop, 200f)
+        // ── Results card ──────────────────────────────────────────────────────
+        y = drawDataCard(
+            canvas, y, "CALCULATION RESULTS",
+            listOf(
+                Row("Monthly EMI",    rupee(state.emi),           COL_BLUE, large = true),
+                Row("Total Interest", rupee(state.totalInterest), COL_AMBER),
+                Row("Total Amount",   rupee(state.totalAmount),   COL_GREEN)
+            )
+        )
+        y += 40f
 
-        sectionLabel(canvas, "CALCULATION RESULTS", resTop + 28f)
-
-        dataRow(canvas, "Monthly EMI",    "₹ ${state.emi}",           resTop + 68f,  COL_BLUE,  large = true)
-        divider(canvas, resTop + 92f)
-        dataRow(canvas, "Total Interest", "₹ ${state.totalInterest}", resTop + 122f, COL_AMBER)
-        divider(canvas, resTop + 145f)
-        dataRow(canvas, "Total Amount",   "₹ ${state.totalAmount}",   resTop + 175f, COL_GREEN)
+        // ── Payment breakdown bar (principal vs interest) ─────────────────────
+        y = drawBreakdown(canvas, y, state)
 
         // ── Footer ────────────────────────────────────────────────────────────
-        canvas.drawRect(0f, PAGE_HEIGHT - 42f, PAGE_WIDTH, PAGE_HEIGHT, fillPaint(COL_BACKGROUND))
+        val footerY = PAGE_HEIGHT - 46f
+        canvas.drawLine(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY, strokePaint(COL_BORDER, 1f))
         canvas.drawText(
-            "Generated by EMI Calculator App",
-            MARGIN, PAGE_HEIGHT - 16f,
-            textPaint(COL_GRAY, 11f)
+            "Generated by LoanSolver",
+            MARGIN, footerY + 20f,
+            textPaint(COL_LIGHT_GRAY, 9f)
         )
         canvas.drawText(
-            "For reference only",
-            PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 16f,
-            textPaint(COL_GRAY, 11f, align = Paint.Align.RIGHT)
+            "For reference only — actual figures may vary by lender",
+            PAGE_WIDTH - MARGIN, footerY + 20f,
+            textPaint(COL_LIGHT_GRAY, 9f, align = Paint.Align.RIGHT)
         )
     }
 
-    // ── Helper drawers ────────────────────────────────────────────────────────
+    private data class Row(
+        val label: String,
+        val value: String,
+        val valueColor: Int,
+        val large: Boolean = false
+    )
 
-    /** Rounded rectangle card background */
-    private fun drawCard(canvas: Canvas, top: Float, height: Float) {
-        val rect = RectF(MARGIN - 8f, top, PAGE_WIDTH - MARGIN + 8f, top + height)
-        canvas.drawRoundRect(rect, 12f, 12f, fillPaint(COL_SURFACE))
-        canvas.drawRoundRect(rect, 12f, 12f, strokePaint(COL_DIVIDER, 1f))
+    /**
+     * Draws a rounded card with a section label and label/value rows.
+     * Returns the y position just below the card.
+     */
+    private fun drawDataCard(canvas: Canvas, top: Float, title: String, rows: List<Row>): Float {
+        val pad = 20f
+        val titleHeight = 30f
+        val rowHeights = rows.map { if (it.large) 40f else 32f }
+        val cardHeight = pad + titleHeight + rowHeights.sum() + pad - 8f
+
+        val rect = RectF(MARGIN, top, PAGE_WIDTH - MARGIN, top + cardHeight)
+        canvas.drawRoundRect(rect, 10f, 10f, fillPaint(COL_CARD))
+        canvas.drawRoundRect(rect, 10f, 10f, strokePaint(COL_BORDER, 1f))
+
+        var y = top + pad + 6f
+        canvas.drawText(title, MARGIN + pad, y, textPaint(COL_BLUE, 9f, bold = true, letterSpaced = true))
+        y += titleHeight - 6f
+
+        rows.forEachIndexed { i, row ->
+            val h = rowHeights[i]
+            val size = if (row.large) 16f else 12f
+            // Baseline centred inside the row band
+            val baseline = y + h / 2f + size / 3f
+
+            canvas.drawText(row.label, MARGIN + pad, baseline, textPaint(COL_GRAY, 11f))
+            canvas.drawText(
+                row.value,
+                PAGE_WIDTH - MARGIN - pad, baseline,
+                textPaint(row.valueColor, size, bold = row.large, align = Paint.Align.RIGHT)
+            )
+
+            if (i < rows.lastIndex) {
+                canvas.drawLine(
+                    MARGIN + pad, y + h,
+                    PAGE_WIDTH - MARGIN - pad, y + h,
+                    strokePaint(COL_BORDER, 0.75f)
+                )
+            }
+            y += h
+        }
+
+        return top + cardHeight
     }
 
-    private fun sectionLabel(canvas: Canvas, text: String, y: Float) {
-        canvas.drawText(text, MARGIN + 8f, y, textPaint(COL_BLUE, 10f, bold = true, letterSpaced = true))
+    /**
+     * Horizontal stacked bar showing principal vs interest share of the total
+     * repayment. Skipped silently if the values can't be parsed.
+     */
+    private fun drawBreakdown(canvas: Canvas, top: Float, state: EMIState): Float {
+        val principal = parseAmount(state.amount) ?: return top
+        val interest  = parseAmount(state.totalInterest) ?: return top
+        val total     = principal + interest
+        if (principal <= 0 || interest < 0 || total <= 0) return top
+
+        var y = top
+        canvas.drawText(
+            "PAYMENT BREAKDOWN",
+            MARGIN, y,
+            textPaint(COL_BLUE, 9f, bold = true, letterSpaced = true)
+        )
+        y += 18f
+
+        val barHeight = 14f
+        val principalWidth = (principal / total * CONTENT_WIDTH).toFloat()
+
+        // Principal segment (left, blue) + interest segment (right, amber)
+        canvas.drawRoundRect(
+            RectF(MARGIN, y, PAGE_WIDTH - MARGIN, y + barHeight),
+            4f, 4f, fillPaint(Color.parseColor("#F0B429"))
+        )
+        canvas.drawRoundRect(
+            RectF(MARGIN, y, MARGIN + principalWidth, y + barHeight),
+            4f, 4f, fillPaint(COL_BLUE)
+        )
+        y += barHeight + 22f
+
+        val pctPrincipal = (principal / total * 100).toInt()
+        val pctInterest  = 100 - pctPrincipal
+
+        // Legend: coloured squares + labels
+        val sq = 8f
+        canvas.drawRect(MARGIN, y - sq, MARGIN + sq, y, fillPaint(COL_BLUE))
+        canvas.drawText(
+            "Principal  $pctPrincipal%",
+            MARGIN + sq + 8f, y,
+            textPaint(COL_GRAY, 10f)
+        )
+
+        val legendX2 = MARGIN + 150f
+        canvas.drawRect(legendX2, y - sq, legendX2 + sq, y, fillPaint(Color.parseColor("#F0B429")))
+        canvas.drawText(
+            "Interest  $pctInterest%",
+            legendX2 + sq + 8f, y,
+            textPaint(COL_GRAY, 10f)
+        )
+
+        return y + 16f
     }
 
-    private fun dataRow(
-        canvas: Canvas,
-        label: String,
-        value: String,
-        y: Float,
-        valueColor: Int,
-        large: Boolean = false
-    ) {
-        val size = if (large) 15f else 13f
-        canvas.drawText(label, MARGIN + 8f, y, textPaint(COL_GRAY, size))
-        canvas.drawText(value, PAGE_WIDTH - MARGIN - 8f, y,
-            textPaint(valueColor, size, bold = large, align = Paint.Align.RIGHT))
-    }
+    /** "12,34,567.89" → 1234567.89; null if blank/unparseable */
+    private fun parseAmount(text: String): Double? =
+        text.replace(",", "").trim().toDoubleOrNull()
 
-    private fun divider(canvas: Canvas, y: Float) {
-        canvas.drawLine(MARGIN + 8f, y, PAGE_WIDTH - MARGIN - 8f, y, strokePaint(COL_DIVIDER, 0.5f))
-    }
+    private fun rupee(value: String) = "₹ $value"
 
     // ── Paint factories ───────────────────────────────────────────────────────
 
@@ -183,9 +271,9 @@ object PdfGenerator {
     }
 
     private fun strokePaint(color: Int, width: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color       = color
-        style            = Paint.Style.STROKE
-        strokeWidth      = width
+        this.color  = color
+        style       = Paint.Style.STROKE
+        strokeWidth = width
     }
 
     private fun textPaint(
@@ -195,10 +283,10 @@ object PdfGenerator {
         align: Paint.Align = Paint.Align.LEFT,
         letterSpaced: Boolean = false
     ) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color      = color
-        textSize        = size * 2.2f       // scale: PDF points → readable on A4
-        isFakeBoldText  = bold
-        textAlign       = align
+        this.color = color
+        textSize   = size            // true PDF points — positions depend on this
+        typeface   = if (bold) Typeface.create(Typeface.DEFAULT, Typeface.BOLD) else Typeface.DEFAULT
+        textAlign  = align
         if (letterSpaced) letterSpacing = 0.12f
     }
 }
