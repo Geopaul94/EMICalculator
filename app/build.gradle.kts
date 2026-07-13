@@ -24,6 +24,10 @@ android {
         targetSdk     = 35
         versionCode   = 1
         versionName   = "1.0.0"
+
+        // Ship only English resources — the AndroidX libraries bundle
+        // translated strings for ~85 locales we don't use.
+        resourceConfigurations += "en"
     }
 
     // ── Signing ───────────────────────────────────────────────────────────────

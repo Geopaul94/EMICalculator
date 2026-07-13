@@ -1,38 +1,19 @@
-# ── Kotlin ────────────────────────────────────────────────────────────────────
--dontwarn kotlin.**
--keepattributes *Annotation*, InnerClasses, Signature, SourceFile, LineNumberTable
+# ── Readable crash reports ────────────────────────────────────────────────────
+# Keep file/line info so Play Console stack traces map back to source,
+# while hiding the original file path.
+-keepattributes SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# ── Jetpack Compose ───────────────────────────────────────────────────────────
-# The Compose compiler plugin handles most rules automatically.
-# We only protect the runtime internals that R8 can incorrectly strip.
--keep class androidx.compose.runtime.** { *; }
--keepclassmembers class * {
-    @androidx.compose.runtime.Composable *;
-}
-
-# ── ViewModel ─────────────────────────────────────────────────────────────────
--keep class * extends androidx.lifecycle.ViewModel { *; }
--keepclassmembers class * extends androidx.lifecycle.ViewModel {
-    <init>();
-}
-
-# ── Our model (StateFlow holds data classes — field names must survive R8) ────
--keep class com.loansolver.app.model.** { *; }
-
-# ── Coroutines ────────────────────────────────────────────────────────────────
--keepclassmembers class kotlinx.coroutines.** { volatile <fields>; }
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--dontwarn kotlinx.coroutines.**
-
-# ── FileProvider (used for PDF sharing) ──────────────────────────────────────
--keep class androidx.core.content.FileProvider { *; }
-
-# ── Splash screen ─────────────────────────────────────────────────────────────
--keep class androidx.core.splashscreen.** { *; }
+# ── No manual -keep rules on purpose ─────────────────────────────────────────
+# AndroidX libraries (Compose, Lifecycle/ViewModel, FileProvider, SplashScreen)
+# ship their own consumer R8 rules inside their AARs. Broad keeps like
+# `-keep class androidx.compose.runtime.** { *; }` disable shrinking and
+# obfuscation for whole libraries and inflate the APK — never add them back
+# unless a specific release crash proves a rule is missing.
+# Our own code uses no reflection or serialization, so nothing to keep there.
 
 # ── Remove all debug/verbose logging in release ───────────────────────────────
-# This shrinks the binary and prevents internal info from leaking.
+# Shrinks the binary and prevents internal info from leaking.
 -assumenosideeffects class android.util.Log {
     public static int d(...);
     public static int v(...);
