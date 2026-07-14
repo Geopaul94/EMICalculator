@@ -19,7 +19,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.loansolver.app"
+        applicationId = "com.geo.loansolver"
         minSdk        = 26
         targetSdk     = 35
         versionCode   = 1
